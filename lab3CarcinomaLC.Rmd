@@ -1,0 +1,195 @@
+---
+title: "lab3"
+output: html_document
+date: "2022-12-02"
+---
+
+1. Load and display the data set carcinoma (library poLCA).
+```{r}
+library(poLCA)
+data(carcinoma) #7 binary variables
+?carcinoma
+head(carcinoma) 
+```
+7 pathology of presence and absence of carcinoma.
+Lable 1: absence of carcinoma
+Lable 2: presence of caricinoma
+A, B ,C.. are the pathologies.
+
+
+2. Use the function poLCA to fit the models with 2, 3 e 4 latent classes to the data.
+```{r}
+formula<-cbind(A,B,C,D,E,F,G)~1  #we don't have covariates so we put 1
+m.2<-poLCA(formula,carcinoma,nclass=2,nrep=10,verbose=FALSE)
+m.3<-poLCA(formula,carcinoma,nclass=3,nrep=10,verbose=FALSE)
+m.4<-poLCA(formula,carcinoma,nclass=4,nrep=10,verbose=FALSE)
+
+```
+We fit 3 different models because we don't know what is the number of the classes.
+nrep are the number of replication from which the algorithm start. 
+verbose=false does not print the output.
+
+```{r}
+names(m.2)
+m.2$predcell
+m.2$bic
+m.3$bic
+```
+observed and expected frequencies for each response pattern.
+
+BIC(2): 706.0739
+BIC(3): 697.1357
+BIC(4): 726.4629
+
+
+3. Compare the estimates of the expected frequencies for the response pattern obtained with the three models.
+```{r}
+freq.estim<-data.frame(m.2$predcell[1:9],m.3$predcell[9],m.4$predcell[9])
+freq.estim
+```
+[9] column in which we have expected frequencies.
+In general m.2 returns expected frequencies that are different from observed and from others two models in some cases.
+We have sparse data. Some expected freq are lower than one.
+
+
+4. Compare the three models considering the following measures: log-likelihood, number of free parameters, likelihood ratio test, Pearson chi-square test (and associated p−value),AIC, BIC.
+```{r}
+K<-c('2', '3', '4')
+llik<-c(m.2$llik,m.3$llik,m.4$llik)
+npar<-c(m.2$npar,m.3$npar,m.4$npar)
+Gsq<-round(c(m.2$Gsq,m.3$Gsq,m.4$Gsq),3) #likelihood ratio statistic, it decreases
+
+Chisq<-round(c(m.2$Chisq,m.3$Chisq,m.4$Chisq),3) #in the 3 cases, it will decrease
+df<-c(m.2$resid.df,m.3$resid.df,m.4$resid.df)
+p.value<-round(1-pchisq(Chisq,df),4)
+
+```
+The latent class with two classes has pvalue 0.7581.
+All pvalues are very high so we can say that the hypothesis are no rejected for both three models.
+
+```{r}
+p.value2<-round(1-pchisq(Gsq,df),4)
+```
+If exp. freq <0.5 the effect is that the pvalue tends to 1 even if the model is not good.
+if exp.freq<1 the effect is that there can be explosive chi square and likelihood ratio test.
+so you can use AIC and BIC
+
+```{r}
+AIC<-round(c(m.2$aic,m.3$aic,m.4$aic),3) #we take the lowest, so the 2.
+
+BIC<-round(c(m.2$bic,m.3$bic,m.4$bic),3) #we take the lowest,so the 2.
+summary<-data.frame(K,llik,npar,Gsq,Chisq,df,p.value,AIC,BIC)
+summary
+
+```
+
+5. Which model shows the best fit to the observed data?
+The latent class model with 3 classes, so the second model we fit according to the AIc and BIC.
+
+```{r}
+summary<-data.frame(K,llik, npar,Gsq, Chisq,df, p.value, p.value2, AIC, BIC)
+summary
+```
+
+
+6. Display the parameter estimates of the three-class model and compare this solution with those obtained with your colleagues. Which problem arises?
+```{r}
+round(m.3$P,4) #display prior probabilities
+lapply(m.3$probs,round,2)
+
+```
+According to the seed that is fixed in the computer the order of the class will change.
+third class pathologist A,B,E,G agree show carcinoma and also C,D usually agree.
+The first class pathologist disagree among each other.
+####
+We can see that class are not ordered in fact they shows different results for the different items:
+the items A, B, E and G provide same results in fact for classes 2 and 3 we see an higher probability that individuals show the carcinoma pathology.
+Items C and D show that only for the second class there is an higher probability that an individual show the pathology.
+And finally for the item F all classes do not show the pathology.
+
+
+7. Use the function poLCA.reorder to solve the indeterminacy of the ranking of the latent classes.
+```{r}
+probs.start.m3<-m.3$probs.start  #starting values used for obtaining the solutions, order the solution in the increasing order of prior.
+new.probs.start.m3<-poLCA.reorder(probs.start.m3,order(m.3$P)) #guarantees the same order of the solution.
+m.3.ord<-poLCA(formula,carcinoma,nclass=3,probs.start=new.probs.start.m3,verbose=FALSE)
+round(m.3.ord$P,4)
+lapply(m.3.ord$probs,round,2)
+
+```
+Proportion of diagnosis for each class. 37% diagnosis belong to class 2.  ###???
+Class 3: is the most class of diagnosis. Class of tissues classifies as tissues with cancer. (pr(2) are the biggest in this class).
+Pat F and D have almost the same probability in class 3.
+Class2: in this class the majority are negative diagnosis. It is the class which have and agreement in negative diagnosis.
+Class1:lowest prior probabilty of beloning. There are inconsistent diagnosis.
+
+
+8. Interpret the three latent classes.
+From this output we see that there is an according in class 3 that is the one in which individuals show the tissue (excepted for item F), and a total according on class 2 that is the one in which people do not show the pathology. 
+They they are respective the class of people with presence of carcinoma and the class with absence of it.
+While the first class does not show a "trend", for three items show a presence of pathology e for other 4 not, hence this class is affected by an inconsistent diagnosis of the tissues.
+
+
+
+9. Compute the estimate of the probability of the agreement of the pathologists in the negative diagnosis.
+```{r}
+p.dnc1<-m.3$P[1]*m.3$probs$A[1,1]*m.3$probs$B[1,1]*m.3$probs$C[1,1]*m.3$probs$D[1,1]*m.3$probs$E[1,1]*m.3$probs$F[1,1]*m.3$probs$G[1,1]
+p.dnc2<-m.3$P[2]*m.3$probs$A[2,1]*m.3$probs$B[2,1]*m.3$probs$C[2,1]*m.3$probs$D[2,1]*m.3$probs$E[2,1]*m.3$probs$F[2,1]*m.3$probs$G[2,1]
+p.dnc3<-m.3$P[3]*m.3$probs$A[3,1]*m.3$probs$B[3,1]*m.3$probs$C[3,1]*m.3$probs$D[3,1]*m.3$probs$E[3,1]*m.3$probs$F[3,1]*m.3$probs$G[3,1]
+p.dn<-p.dnc1+p.dnc2+p.dnc3  #probability of negative agreement diagnosis for over all classes
+round(p.dn,4)
+
+```
+
+```{r}
+p.dnc1ord<-m.3.ord$P[1]*m.3.ord$probs$A[1,1]*m.3.ord$probs$B[1,1]*m.3.ord$probs$C[1,1]*m.3.ord$probs$D[1,1]*m.3.ord$probs$E[1,1]*m.3.ord$probs$F[1,1]*m.3.ord$probs$G[1,1]
+```
+
+10. Compute the estimate of the number of tissues for which the pathologists agree in the negative diagnosis.
+```{r}
+p.dn*118 #118 tissues
+round(p.dn*m.3$N,4)
+```
+
+
+11. Display the posterior probability estimates of the response pattern (1,1,1,1,1,1,1) for the three latent classes. In which class the sample of tissue correspondent to this response pattern is allocated?
+```{r}
+post.1<-m.3.ord$posterior[1,]
+round(post.1,5)
+
+#
+a<-as.numeric(row.names(carcinoma[which(carcinoma$A==1&carcinoma$B==1&
+carcinoma$C==1&carcinoma$D==1&carcinoma$E==1&carcinoma$F==1&
+carcinoma$G==1),]))
+post.11<-m.3.ord$posterior[a[1],]
+round(post.11,5)
+```
+the probability of belonging to class 2 is 1.
+the first response pattern is the one that corresponds to negative diagnosis for all pathologist.
+We could see that the table is ordered from (1,1,1,1,1,1,1) to (2,2,2,2,2,2,2) and so if we would like to know the posterior probability of the pattern that represents the absolute presence of the pathology we would have code
+m.3.ord$posterior[118,]
+The results are perfectly coherent with the estimated probability of belonging that we found in point 7.
+
+
+12. Display the latent class in which the samples of tissue are allocated according to highest posterior probability.
+```{r}
+m.3.ord$predclass
+table(m.3.ord$predclass)
+```
+we can see the allocation of the tissues to which class.
+clear allocation with the table, according to the posterior probabilities.
+
+
+13. Select the samples of tissues allocated to the class of inconsistent diagnosis and evaluate the correspondent response pattern.
+```{r}
+sel<-carcinoma[m.3.ord$predclass==1,]
+sel
+
+```
+which kind of response pattern is associated to the tissues.
+There is a disagreement among the pathologist.
+
+```{r}
+round(m.3.ord$posterior[52,],5)
+```
+The posterior probability of this tissue of belonging in class1 is 1.

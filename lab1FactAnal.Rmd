@@ -1,0 +1,175 @@
+---
+title: "lab1 latent"
+output: html_document
+date: "2022-11-25"
+---
+
+```{r}
+library(lavaan)
+```
+
+1. Load and display the data set HolzingerSwineford1939 (library lavaan).
+```{r}
+data(HolzingerSwineford1939)  #mental ability of some students
+head(HolzingerSwineford1939)
+data<-HolzingerSwineford1939[,c('x1','x2','x3','x4','x5','x6','x7','x8','x9')]
+dim(data)
+
+```
+
+START WITH AN EXPLORATORY FACTOR ANALYSIS
+
+2. Explore the correlation matrix of the data in order evaluate if a factor model can be fitted.
+```{r}
+matcor<-cor(data) 
+```
+the 3 variables related to the speed are correlated each other but not with other variables.
+the second 3 variables are very highly correlated.
+we know that an assumption of the linear factor model is that x's must be correlated each other.
+
+
+3. Estimate a factor model with 1,2 and 3 factors using the Maximum Likelihood method and select the best model using the Chi-square test. Use the function factanal.
+```{r}
+f1<-factanal(~x1+x2+x3+x4+x5+x6+x7+x8+x9,data=data,1) #1 factor
+f2<-factanal(~x1+x2+x3+x4+x5+x6+x7+x8+x9,data=data,2) #2 factors
+f3<-factanal(~x1+x2+x3+x4+x5+x6+x7+x8+x9,data=data,3) #3 factors
+?factanal
+
+Chisq<-round(c(f1$STATISTIC,f2$STATISTIC,f3$STATISTIC),3)
+df<-c(f1$dof,f2$dof,f3$dof)
+
+pvalue<-round(c(f1$PVAL,f2$PVAL,f3$PVAL),4)
+```
+Following using f3 because its pvalue is the only one different from 0. This is the only model for which we do not reject the likelihood ratio test.
+
+
+4. On the basis of the matrix of the factor loadings interpret the factors individuated
+```{r}
+f3$loadings
+print(f3, cutoff=0) #all loadings corresponding to each observed value
+print(f3,cutoff=0.3) #shows only the loadings that are >0.3
+```
+The first factor is explaining the 0.243 of the variance.
+x5 is the item having the lowest uniqueness.
+We can say that f1 is the class releated to the intelligence,
+  f2 the factor about visualization;
+  f3 concern the speed abilities.
+  
+
+5. Compute the communalities and comment them. Which percentage of the variance of the model is explained by the three-factor model?
+```{r}
+sum(loadings(f3)[,1]^2) #sum of square for the loadings for each factor
+sum(loadings(f3)[,1]^2)/9   #this is the proportion of variance that we can see before.
+
+comm<-1-f3$uniq
+
+comm<-rowSums(loadings(f3)^2)
+percvar<-sum(comm)/9 #overall variability
+
+```
+The uniqueness shows the percenatge of the variance of the vaiable explained by the unique factors.
+The communality gives the percentage of the variance of the variable that is explained by the 3 factors.
+The percvar shows the percentage of the overall variance of the model that is explained by the three factors.
+
+
+Compute the reproduced correlation matrix and the discrepancy between the observed and reproduced correlation.
+```{r}
+repcorr<-loadings(f3)%*%t(loadings(f3))
+round(matcor-repcorr,3)
+```
+The value are generally small so we can say that the two matrix are quite similar.
+
+6. Apply different orthogonal and oblique rotations and interpret the solutions obtained
+
+orthogonal rotations: assume that factors are uncorrelated and so the matrix loadings is equal to the correlation between x and y
+oblique rotations: the matrix of correlation between x and y is the matrix of loading*matrix of correlation of y (good results by passing the unrealistic uncorrelation assumption)
+```{r}
+library(GPArotation)
+varimax(loadings(f3))  #few factors with high loading and the others near to 0
+#print(varimax(loadings(f3)),cutoff=0.3)
+quartimax(loadings(f3)) #evidence the correspondence between x and y
+oblimin(loadings(f3)) #varimax-looking factors
+```
+
+In this example different rotations provide quite similar result especially in terms of interpretation of loadings.
+The first factor shows higher loading in the variables 4,5,6, so we can say that we have found the class of ....
+The second factor is related to variables 1,2,3.
+The third factor to variables 7,8,9.
+
+7. Compute the factor scores using the Bartlett and the Thompson method
+```{r}
+fb<-factanal(~x1+x2+x3+x4+x5+x6+x7+x8+x9, data=data, 3, scores = "Bartlett")$scores
+
+#minumum value for the first factor
+min(fb[,1])
+which(fb[,1]==min(fb[,1]))
+max(fb[,1])
+which.max(fb[,1])
+#which(fb[,1]==max(fb[,1]))
+plot(fb[,1])
+which.min(abs(fb[,1]))
+min(abs(fb[,1]))
+
+ft<-factanal(~x1+x2+x3+x4+x5+x6+x7+x8+x9, data=data, 3, scores = "regression")$scores
+max(ft[,1])
+min(ft[,1])
+```
+The points number 47 has the biggest negative scores, so that means that this one is very high negative correlated with the first factor model while the biggest positive correlated is the number 196.
+The lowest correlated observation with the first factor is the n 290.
+
+Bartlett is based on the maximum likelihood estimation so it requires the normality assumption.
+Thompson is based on a bayesian approach.
+
+
+8. On the basis of the previous analysis perform a confirmatory factor analysis using the function cfa in lavaan.
+CONFIRMATORY FACTOR MODEL
+```{r}
+HS.model <- "visual =∼ x1 + x2 + x3
+  textual =∼ x4 + x5 + x6
+  speed =∼ x7 + x8 + x9"
+
+fit<-cfa(HS.model, data = data)
+
+summary(fit,fit.measures=TRUE)
+
+```
+For visual the first loading ($latent variables) is 1, the second is 0.55 and the third 0.73.
+The Z is computed with the Wald test statistic.
+Since latent variables are not observable we don't know their means and variances (=identification problem)
+->alternative parametrisation: fix equal to 1 one of the loadings.
+So we have the covariance matrix instead of the correlation matrix and then we can estimate the variances.
+
+AIC=7517.49
+BIC=7595.339
+
+```{r}
+fit <- cfa(HS.model, data = HolzingerSwineford1939, std.lv = TRUE)
+fit.HS.ortho <- cfa(HS.model, data = HolzingerSwineford1939, orthogonal = TRUE)
+```
+CFI is good (>0.90) = = comparative fit index 0.931.
+The CFI analyze the model fit by examining the discrepancy between the data and the hypotized model. Its values range from 0 to 1 and the higher the better.
+we can try to improve the model because is is good but ...
+
+```{r}
+HS.model1 <- 'visual =∼ x1 + x2 + x3 + x9
+  textual =∼ x4 + x5 + x6
+  speed =∼ x7 + x8 + x9'
+
+?cfa
+fit1<- cfa(HS.model1, data=data)
+summary(fit1,fit.measures=TRUE)
+
+```
+x9 is a measure of two latent variables.
+CFI=0.967
+AIC=7486.556
+BIC=7568.123
+
+
+```{r}
+fit$bic
+fit1$bic
+```
+In terms of bic the second model performs better than the first.
+Here we are quite satisfied for the solution.
+Also in terms of AIC the second model performs better than the first

@@ -1,0 +1,89 @@
+---
+title: "lab1ex2"
+output: html_document
+date: "2023-01-02"
+---
+
+713 people married respondents.
+the file socmob.txt contains the correlation matrix.
+
+1)load the correlation matrix and explore the correlation matrix in order to evaluate if the factor model can be fitted.
+```{r}
+setwd("C:/Users/Utente/OneDrive/Desktop/LM/latent")
+cormat<-read.table("socmob.txt")
+cormat<-as.matrix(cormat)
+```
+All variables are correlated among each other and that means the correlation assumption holds and a factor model can be fitted.
+#(x,y continuous, x correlated, y independent from e, e uncorrelated)
+
+2)estimate a factor model with 1,2,3,4 factors using the maximum likelihood methos and select the best model using the chisquare test.
+```{r}
+#factanal performs ML factor analysis on a cov or cor matrix
+n=713
+formula<-"V1+V2+V3+V4+V5+V6+V7+V8+V9+V10"
+f1<-factanal(formula, covmat = cormat, n.obs = n, factors = 1, rotation = "none")
+f2<-factanal(formula, covmat = cormat, n.obs = n, factors = 2, rotation = "none")
+f3<-factanal(formula, covmat = cormat, n.obs = n, factors = 3, rotation = "none")
+f4<-factanal(formula, covmat = cormat, n.obs = n, factors = 4, rotation = "none")
+
+chisq<-round(c(f1$STATISTIC, f2$STATISTIC, f3$STATISTIC, f4$STATISTIC),3)
+chisq
+df<-round(c(f1$dof,f2$dof,f3$dof, f4$dof),3)
+pvalues<-round(c(f1$PVAL,f2$PVAL,f3$PVAL,f4$PVAL),3)
+pvalues
+```
+the pavlues show that the only value different from zero corresponds to the 4factor model so we keep it.
+
+```{r}
+f4
+f3
+```
+looking at the uniqueness we can see that there are some value very close to zero. this means that we are in the heywood case.
+a solution to this problem is to consider a lower number of factors so we keep the 3 factor model.
+
+One of the assumption of the factor model is that the uniqueness matrix is diagonal with non zero diagonal elements. In the heywood case it can happen that some uniqueness are equal or lower than zero.
+This can happen when 1.we are trying to work with more factors than the present, 2.the sample is too small, 3.we have too correlated variables.
+Remedies are 1.reduce the number of factors to consider, 2.reduce the number of variables, 3.examine a bigger sample, 4.take a bayesian approach, 5.stop iteration at some small arbitrary level of the uniqueness.
+
+3) compute the communalities and comment them. which percentage of the variance of the model is explained by the three factor model?
+```{r}
+f3
+comm<-1-f3$uniquenesses
+comm
+percvar<-sum(comm)/10
+```
+The common 3 factors explain the 43% of the variance of the model.
+The three factors explain the 34% of the variance of the first variable.
+
+4)compute the reproduced correlation matrix and the discrepancy between the observed and the reproduced correlation.
+```{r}
+repcorr<-loadings(f3)%*%t(loadings(f3))#communalities on diag
+resid<-round((cormat-repcorr),3)#uniqueness on diag
+```
+the values are closer to zero so that means the model is good.
+
+5) Apply different orthogonal and oblique rotations and interpret the solution obtained.
+```{r}
+library(GPArotation)
+varimax(loadings(f3)) #few factors with high loadings, other close to zero
+quartimax(loadings(f3))#evidence of the correspondence between x and y
+oblimin(loadings(f3))#varimax-looking factors.
+```
+both three rotations provide the same interpretations to the loadings, that easier than to the original.
+orthogonal rotations:uncorrelation between factors assumed so matrix of factor loadings =corr(x,y)
+oblique rotations:corr(x,y) is equal to the matrix of factor loading time the matrix of corr(y). obtain better solution bypassing the unrealistic assumption of uncrrelation between factors.
+
+
+6)on the basis of the previous analysis perform a confirmatory factor analysis using cfa.
+```{r}
+library(lavaan)
+formula2<-"F1=~V8+V9
+  F2=~V1+V2+V5+V10
+  F3=~V3+V4+V6+V7"
+fit<-cfa(formula2, sample.cov = cormat, sample.nobs = n, std.lv=TRUE)
+
+summary(fit, fit.measures=T)
+```
+
+the ouput returns medium high values for covariances between the three factors and high values for the covariances between factors and variables
+0.347 the 8th variable explain the 35% of the variances of the data.
